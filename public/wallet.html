@@ -2,14 +2,275 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>محفظة المعجبين - Fans</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 min-h-screen p-6">
-  <div class="max-w-5xl mx-auto space-y-6">
-    <h1 class="text-2xl font-bold text-emerald-700">محفظة المعجبين (Wallet)</h1>
-    <p>هذه نسخة مبدئية لواجهة Wallet.</p>
+  <div class="max-w-6xl mx-auto space-y-6">
+    <!-- Header -->
+    <header class="flex items-center gap-3">
+      <h1 class="text-2xl font-extrabold text-emerald-700">محفظة المعجبين (Wallet)</h1>
+      <span class="text-slate-400 text-sm">متصلة بواجهة API الخاصة بك</span>
+    </header>
+
+    <!-- Fan selector -->
+    <section class="bg-white p-4 rounded-2xl shadow flex flex-wrap items-center gap-3">
+      <label class="text-sm text-slate-600">معرّف المعجب:</label>
+      <input id="fanId" class="border rounded px-3 py-2 w-64" placeholder="مثال: fan_123" />
+      <button id="btnLoad" class="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700">تحميل الرصيد</button>
+      <button id="btnReset" class="px-4 py-2 rounded bg-slate-200 hover:bg-slate-300">تفريغ الشاشة</button>
+      <div class="ms-auto text-xs text-slate-500">Health: <span id="health" class="font-bold">—</span></div>
+    </section>
+
+    <!-- Balances -->
+    <section class="grid md:grid-cols-3 gap-4">
+      <div class="bg-white p-5 rounded-2xl shadow">
+        <div class="text-slate-500 text-sm">رصيد النقاط</div>
+        <div id="points" class="text-4xl font-extrabold mt-1">—</div>
+      </div>
+      <div class="bg-white p-5 rounded-2xl shadow">
+        <div class="text-slate-500 text-sm">رصيد الأموال</div>
+        <div id="money" class="text-4xl font-extrabold mt-1">—</div>
+      </div>
+      <div class="bg-white p-5 rounded-2xl shadow">
+        <div class="text-slate-500 text-sm">آخر عملية</div>
+        <div id="lastOp" class="text-sm mt-1 text-slate-700">—</div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <section class="grid md:grid-cols-2 gap-4">
+      <!-- Award -->
+      <div class="bg-white p-5 rounded-2xl shadow space-y-3">
+        <h2 class="font-bold text-slate-800">منح جائزة (أدمن)</h2>
+        <div class="flex flex-wrap gap-2">
+          <select id="awardCurrency" class="border rounded px-3 py-2">
+            <option value="POINTS">نقاط</option>
+            <option value="MONEY">أموال</option>
+          </select>
+          <input id="awardAmount" type="number" class="border rounded px-3 py-2 w-36" placeholder="القيمة"/>
+          <input id="awardReason" class="border rounded px-3 py-2 flex-1" placeholder="السبب (اختياري)"/>
+          <button id="btnAward" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">منح</button>
+        </div>
+        <p class="text-xs text-slate-500">* يتطلب صلاحية أدمن في الـ API (حالياً غير محمي للتجربة).</p>
+      </div>
+
+      <!-- Redeem + Withdraw -->
+      <div class="bg-white p-5 rounded-2xl shadow space-y-3">
+        <h2 class="font-bold text-slate-800">استبدال / سحب</h2>
+        <div class="flex flex-wrap gap-2">
+          <input id="redeemPoints" type="number" class="border rounded px-3 py-2 w-40" placeholder="نقاط للاستبدال"/>
+          <button id="btnRedeem" class="px-4 py-2 rounded bg-amber-600 text-white hover:bg-amber-700">استبدال نقاط</button>
+          <span class="w-px h-8 bg-slate-200"></span>
+          <input id="withdrawAmount" type="number" class="border rounded px-3 py-2 w-40" placeholder="مبلغ للسحب"/>
+          <button id="btnWithdraw" class="px-4 py-2 rounded bg-rose-600 text-white hover:bg-rose-700">سحب أموال</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Convert -->
+    <section class="bg-white p-5 rounded-2xl shadow space-y-3">
+      <h2 class="font-bold text-slate-800">تحويل بين النقاط والأموال</h2>
+      <p class="text-sm text-slate-500">المعدل الحالي: <b>100 نقطة = 1 ريال</b></p>
+      <div class="flex flex-wrap gap-2">
+        <select id="convertDirection" class="border rounded px-3 py-2">
+          <option value="MONEY_TO_POINTS">تحويل أموال ← نقاط</option>
+          <option value="POINTS_TO_MONEY">تحويل نقاط ← أموال</option>
+        </select>
+        <input id="convertAmount" type="number" class="border rounded px-3 py-2 w-40" placeholder="القيمة"/>
+        <button id="btnConvert" class="px-4 py-2 rounded bg-violet-600 text-white hover:bg-violet-700">تحويل</button>
+        <span class="text-xs text-slate-500" id="convertHint">أدخل المبلغ للتحويل</span>
+      </div>
+    </section>
+
+    <!-- Ledger -->
+    <section class="bg-white p-5 rounded-2xl shadow space-y-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="font-bold text-slate-800 flex-1">سجلّ العمليات</h2>
+        <select id="filterCurrency" class="border rounded px-3 py-2">
+          <option value="">كل العملات</option>
+          <option>POINTS</option>
+          <option>MONEY</option>
+        </select>
+        <select id="filterType" class="border rounded px-3 py-2">
+          <option value="">كل الأنواع</option>
+          <option>AWARD</option>
+          <option>REDEEM</option>
+          <option>WITHDRAW</option>
+          <option>CONVERT</option>
+        </select>
+        <button id="btnReloadLedger" class="px-4 py-2 rounded bg-slate-700 text-white hover:bg-slate-800">تحديث</button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-500">
+              <th class="py-2">الوقت</th>
+              <th>النوع</th>
+              <th>العملة</th>
+              <th>المقدار</th>
+              <th>السبب</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="toast" class="fixed bottom-4 right-4 hidden bg-emerald-600 text-white rounded px-4 py-2 shadow"></div>
   </div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const api = path => fetch(path).then(r => r.json());
+
+    async function health() {
+      try {
+        const r = await api('/api/health');
+        $('#health').textContent = r.status || '—';
+      } catch { $('#health').textContent = 'خطأ'; }
+    }
+
+    function toast(msg, ok=true) {
+      const t = $("#toast");
+      t.textContent = msg;
+      t.className = "fixed bottom-4 right-4 rounded px-4 py-2 shadow " + (ok ? "bg-emerald-600 text-white" : "bg-rose-600 text-white");
+      t.classList.remove("hidden");
+      setTimeout(()=>t.classList.add("hidden"), 2200);
+    }
+
+    function lastOpSet(text) { $("#lastOp").textContent = text; }
+
+    async function loadWallet() {
+      const fanId = $("#fanId").value.trim();
+      if (!fanId) return toast("أدخل معرف المعجب", false);
+      const j = await api(`/api/wallet/${encodeURIComponent(fanId)}`);
+      if (j.ok) {
+        $("#points").textContent = j.wallet.points ?? 0;
+        $("#money").textContent  = j.wallet.money  ?? 0;
+        lastOpSet("—");
+        await loadLedger();
+      } else toast("تعذر جلب الرصيد", false);
+    }
+
+    async function loadLedger() {
+      const fanId = $("#fanId").value.trim();
+      if (!fanId) return;
+      const currency = $("#filterCurrency").value;
+      const type = $("#filterType").value;
+      const qs = new URLSearchParams({ limit: 50, ...(currency && {currency}), ...(type && {type}) });
+      const r = await fetch(`/api/wallet/${encodeURIComponent(fanId)}/ledger?`+qs.toString());
+      const j = await r.json();
+      const body = $("#ledgerBody"); body.innerHTML = "";
+      if (!j.ok) return;
+
+      j.rows.forEach(txn=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="py-1 text-slate-500">${new Date(txn.createdAt).toLocaleString()}</td>
+          <td>${txn.type}</td>
+          <td>${txn.currency||"-"}</td>
+          <td class="${txn.amount<0?'text-rose-600':'text-emerald-700'} font-bold">${txn.amount}</td>
+          <td class="text-slate-600">${txn.reason||""}</td>`;
+        body.appendChild(tr);
+      });
+    }
+
+    async function doAward() {
+      const fanId = $("#fanId").value.trim();
+      const currency = $("#awardCurrency").value;
+      const amount = Number($("#awardAmount").value);
+      const reason = $("#awardReason").value;
+      if (!fanId || !amount) return toast("تحقق من القيم", false);
+      const r = await fetch("/api/wallet/award", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ fanId, currency, amount, reason })
+      });
+      const j = await r.json();
+      if (j.ok) {
+        $("#points").textContent = j.wallet.points;
+        $("#money").textContent  = j.wallet.money;
+        lastOpSet(`تم منح ${amount} ${currency === 'POINTS' ? 'نقطة' : 'ريال'}`);
+        $("#awardAmount").value=""; $("#awardReason").value="";
+        loadLedger(); toast("تم المنح");
+      } else toast(j.error || "فشل المنح", false);
+    }
+
+    async function doRedeem() {
+      const fanId = $("#fanId").value.trim();
+      const points = Number($("#redeemPoints").value);
+      if (!fanId || !points) return toast("تحقق من القيم", false);
+      const r = await fetch("/api/wallet/redeem", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ fanId, points, reason:"Redeem via UI" })
+      });
+      const j = await r.json();
+      if (j.ok) {
+        $("#points").textContent = j.wallet.points;
+        $("#money").textContent  = j.wallet.money;
+        $("#redeemPoints").value="";
+        lastOpSet(`استبدال ${Math.abs(j.txn.amount)} نقطة`);
+        loadLedger(); toast("تم الاستبدال");
+      } else toast(j.error || "فشل الاستبدال", false);
+    }
+
+    async function doWithdraw() {
+      const fanId = $("#fanId").value.trim();
+      const amount = Number($("#withdrawAmount").value);
+      if (!fanId || !amount) return toast("تحقق من القيم", false);
+      const r = await fetch("/api/wallet/withdraw", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ fanId, amount, reason:"Withdraw via UI" })
+      });
+      const j = await r.json();
+      if (j.ok) {
+        $("#points").textContent = j.wallet.points;
+        $("#money").textContent  = j.wallet.money;
+        $("#withdrawAmount").value="";
+        lastOpSet(`سحب ${Math.abs(j.txn.amount)} ريال`);
+        loadLedger(); toast("تم السحب");
+      } else toast(j.error || "فشل السحب", false);
+    }
+
+    function updateConvertHint() {
+      const dir = $("#convertDirection").value;
+      $("#convertHint").textContent =
+        dir === "MONEY_TO_POINTS" ? "سيتم تحويل الأموال إلى نقاط (100 نقطة = 1 ريال)" :
+        "سيتم تحويل النقاط إلى أموال (100 نقطة = 1 ريال)";
+    }
+
+    async function doConvert() {
+      const fanId = $("#fanId").value.trim();
+      const direction = $("#convertDirection").value;
+      const amount = Number($("#convertAmount").value);
+      if (!fanId || !amount) return toast("تحقق من القيم", false);
+      const r = await fetch("/api/wallet/convert", {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ fanId, direction, amount })
+      });
+      const j = await r.json();
+      if (j.ok) {
+        $("#points").textContent = j.wallet.points;
+        $("#money").textContent  = j.wallet.money;
+        $("#convertAmount").value="";
+        lastOpSet(`تحويل (${direction}) بمقدار ${amount}`);
+        loadLedger(); toast("تم التحويل");
+      } else toast(j.error || "فشل التحويل", false);
+    }
+
+    // UI events
+    $("#btnLoad").onclick = loadWallet;
+    $("#btnReset").onclick = () => { $("#fanId").value=""; $("#points").textContent="—"; $("#money").textContent="—"; $("#ledgerBody").innerHTML=""; lastOpSet("—"); };
+    $("#btnReloadLedger").onclick = loadLedger;
+    $("#btnAward").onclick = doAward;
+    $("#btnRedeem").onclick = doRedeem;
+    $("#btnWithdraw").onclick = doWithdraw;
+    $("#btnConvert").onclick = doConvert;
+    $("#convertDirection").onchange = updateConvertHint;
+
+    health(); updateConvertHint();
+  </script>
 </body>
 </html>
