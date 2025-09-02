@@ -84,6 +84,53 @@ app.post("/api/wallet/withdraw", (req, res) => {
   const txn = addLedger({ fanId, type:"WITHDRAW", currency:"MONEY", amount:-amount, reason });
   res.json({ ok:true, wallet: fan.wallet, txn });
 });
+// تحويل بين النقاط والفلوس (مثال: 100 نقطة = 1 ريال)
+app.post("/api/wallet/convert", (req, res) => {
+  const { fanId, direction, amount } = req.body;
+  // direction = "POINTS_TO_MONEY" أو "MONEY_TO_POINTS"
+  if (!fanId || !direction || !(amount > 0)) {
+    return res.status(400).json({ ok: false, error: "bad_input" });
+  }
+
+  const fan = ensureFan(fanId);
+  const rate = 100; // 100 نقطة = 1 ريال
+
+  if (direction === "POINTS_TO_MONEY") {
+    const requiredPoints = amount * rate;
+    if (fan.wallet.points < requiredPoints) {
+      return res.status(400).json({ ok: false, error: "insufficient_points" });
+    }
+    fan.wallet.points -= requiredPoints;
+    fan.wallet.money += amount;
+    const txn = addLedger({
+      fanId,
+      type: "CONVERT",
+      currency: "MONEY",
+      amount,
+      reason: `Convert ${requiredPoints} points to ${amount} money`
+    });
+    return res.json({ ok: true, wallet: fan.wallet, txn });
+  }
+
+  if (direction === "MONEY_TO_POINTS") {
+    if (fan.wallet.money < amount) {
+      return res.status(400).json({ ok: false, error: "insufficient_funds" });
+    }
+    const points = amount * rate;
+    fan.wallet.money -= amount;
+    fan.wallet.points += points;
+    const txn = addLedger({
+      fanId,
+      type: "CONVERT",
+      currency: "POINTS",
+      amount: points,
+      reason: `Convert ${amount} money to ${points} points`
+    });
+    return res.json({ ok: true, wallet: fan.wallet, txn });
+  }
+
+  return res.status(400).json({ ok: false, error: "invalid_direction" });
+});
 
 // Start server
 const PORT = process.env.PORT || 3000;
